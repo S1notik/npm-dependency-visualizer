@@ -1,0 +1,20 @@
+
+# Java
+*.class
+*.jar
+*.war
+
+# Build
+/build/
+/out/
+/target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Logs
+*.log

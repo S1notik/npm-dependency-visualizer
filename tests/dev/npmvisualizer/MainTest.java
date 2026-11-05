@@ -5,7 +5,10 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import dev.npmvisualizer.registry.NpmRegistryClient;
+import dev.npmvisualizer.registry.RegistryTransport.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,19 +20,45 @@ class MainTest {
     Path directory;
 
     @Test
-    void printsAllSettings() throws Exception {
-        Path config = directory.resolve("config.csv");
-        Files.writeString(config, "packageName,repository,testMode,asciiTree\n"
-                + "lodash,https://registry.npmjs.org,false,true\n");
+    void printsDependenciesInsteadOfSettings() throws Exception {
+        Path config = writeConfig("demo,https://registry.example,false,true");
+        NpmRegistryClient client = new NpmRegistryClient(uri -> new Response(200,
+                "{\"name\":\"demo\",\"version\":\"1.2.0\",\"dependencies\":{\"z\":\"^2\",\"a\":\"~1\"}}"));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
-        int code = Main.run(new String[]{config.toString()},
-                new PrintStream(output), new PrintStream(errors));
+        int code = Main.run(new String[]{config.toString()}, new PrintStream(output), new PrintStream(errors), client);
         assertEquals(0, code);
-        assertEquals(String.join(System.lineSeparator(), "packageName=lodash",
-                "repository=https://registry.npmjs.org", "testMode=false", "asciiTree=true", ""),
+        assertEquals(String.join(System.lineSeparator(), "Пакет: demo@1.2.0 (тег latest)",
+                "Прямые зависимости из манифеста:", "dependencies:", "  a = ~1", "  z = ^2", ""),
                 output.toString(StandardCharsets.UTF_8));
         assertEquals("", errors.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void reportsHttpErrorWithoutPartialOutput() throws Exception {
+        Path config = writeConfig("missing,https://registry.example,false,false");
+        NpmRegistryClient client = new NpmRegistryClient(uri -> new Response(404, "not found"));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        assertEquals(1, Main.run(new String[]{config.toString()}, new PrintStream(output),
+                new PrintStream(errors), client));
+        assertEquals("", output.toString(StandardCharsets.UTF_8));
+        assertTrue(errors.toString(StandardCharsets.UTF_8).contains("HTTP 404"));
+    }
+
+    @Test
+    void reportsThatTestRepositoryIsNotImplementedWithoutCallingNetwork() throws Exception {
+        Path repository = Files.createFile(directory.resolve("repository.txt"));
+        Path config = writeConfig("A," + repository + ",true,false");
+        AtomicBoolean called = new AtomicBoolean();
+        NpmRegistryClient client = new NpmRegistryClient(uri -> {
+            called.set(true);
+            return new Response(200, "{}");
+        });
+        ByteArrayOutputStream errors = new ByteArrayOutputStream();
+        assertEquals(1, Main.run(new String[]{config.toString()}, System.out, new PrintStream(errors), client));
+        assertFalse(called.get());
+        assertTrue(errors.toString(StandardCharsets.UTF_8).contains("этапе 3"));
     }
 
     @Test
@@ -55,5 +84,11 @@ class MainTest {
         ByteArrayOutputStream errors = new ByteArrayOutputStream();
         assertEquals(1, Main.run(new String[]{config.toString()}, System.out, new PrintStream(errors)));
         assertTrue(errors.toString(StandardCharsets.UTF_8).contains("Ошибка конфигурации"));
+    }
+
+    private Path writeConfig(String row) throws Exception {
+        Path config = directory.resolve("config.csv");
+        Files.writeString(config, "packageName,repository,testMode,asciiTree\n" + row + "\n");
+        return config;
     }
 }

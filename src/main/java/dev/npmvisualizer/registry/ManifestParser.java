@@ -16,7 +16,11 @@ public class ManifestParser {
 
     /** Разбирает JSON и возвращает метаданные с отсортированными именами зависимостей. */
     public PackageMetadata parse(String json) {
-        Object parsed = JsonParser.parse(json);
+        return parseObject(JsonParser.parse(json));
+    }
+
+    /** Извлекает данные уже разобранного объекта манифеста. */
+    public PackageMetadata parseObject(Object parsed) {
         if (!(parsed instanceof Map<?, ?> object)) {
             throw new IllegalArgumentException("корнем JSON должен быть объект");
         }

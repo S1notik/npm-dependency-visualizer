@@ -1,0 +1,2 @@
+packageName,repository,testMode,asciiTree
+A,config/repositories/cycle.txt,true,false

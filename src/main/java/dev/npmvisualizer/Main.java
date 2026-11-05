@@ -3,12 +3,15 @@ package dev.npmvisualizer;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Path;
-import java.util.Map;
-
 import dev.npmvisualizer.config.AppConfig;
 import dev.npmvisualizer.config.CsvConfigReader;
+import dev.npmvisualizer.graph.Dependency;
+import dev.npmvisualizer.graph.DependencyGraph;
+import dev.npmvisualizer.graph.FileGraphRepository;
+import dev.npmvisualizer.graph.GraphBuilder;
+import dev.npmvisualizer.graph.PackageRepository;
+import dev.npmvisualizer.registry.NpmPackageRepository;
 import dev.npmvisualizer.registry.NpmRegistryClient;
-import dev.npmvisualizer.registry.PackageMetadata;
 
 /** Точка входа приложения и обработка ошибок командной строки. */
 public class Main {
@@ -42,39 +45,43 @@ public class Main {
             errors.println("Ошибка конфигурации: " + exception.getMessage());
             return ERROR;
         }
-        return printDependencies(config, output, errors, client);
+        return buildGraph(config, output, errors, client);
     }
 
-    private static int printDependencies(AppConfig config, PrintStream output,
-                                         PrintStream errors, NpmRegistryClient client) {
-        if (config.isTestMode()) {
-            errors.println("Тестовый репозиторий будет поддержан на этапе 3.");
-            return ERROR;
-        }
+    private static int buildGraph(AppConfig config, PrintStream output,
+                                  PrintStream errors, NpmRegistryClient client) {
         try {
-            PackageMetadata metadata = client.fetch(config.getRepository(), config.getPackageName());
-            printMetadata(metadata, output);
+            PackageRepository repository = config.isTestMode()
+                    ? FileGraphRepository.read(Path.of(config.getRepository()))
+                    : new NpmPackageRepository(config.getRepository(), client);
+            DependencyGraph graph = new GraphBuilder().build(repository, config.getPackageName());
+            printGraph(graph, output);
             return SUCCESS;
         } catch (IOException | IllegalArgumentException exception) {
-            errors.println("Ошибка получения зависимостей: " + exception.getMessage());
+            errors.println("Ошибка построения графа: " + exception.getMessage());
             return ERROR;
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            errors.println("Получение зависимостей прервано.");
+            errors.println("Построение графа прервано.");
             return ERROR;
         }
     }
 
-    private static void printMetadata(PackageMetadata metadata, PrintStream output) {
-        output.println("Пакет: " + metadata.name() + "@" + metadata.version() + " (тег latest)");
-        if (metadata.groups().isEmpty()) {
-            output.println("Прямые зависимости не указаны.");
-            return;
-        }
-        output.println("Прямые зависимости из манифеста:");
-        for (Map.Entry<String, Map<String, String>> group : metadata.groups().entrySet()) {
-            output.println(group.getKey() + ":");
-            group.getValue().forEach((name, version) -> output.println("  " + name + " = " + version));
-        }
+    private static void printGraph(DependencyGraph graph, PrintStream output) {
+        output.println("Пакеты (" + graph.nodes().size() + "):");
+        graph.nodes().keySet().forEach(name -> output.println("  " + name));
+        output.println("Связи (" + graph.edges().size() + "):");
+        graph.edges().forEach(edge -> output.println(formatEdge(edge)));
+        long backEdges = graph.edges().stream().filter(DependencyGraph.Edge::backEdge).count();
+        output.println("Обратные рёбра DFS (признаки циклов): " + backEdges);
+    }
+
+    private static String formatEdge(DependencyGraph.Edge edge) {
+        Dependency dependency = edge.declaration();
+        String detail = dependency.requirement().isEmpty() ? ""
+                : " [" + dependency.name() + ": " + dependency.requirement() + "]";
+        String optional = dependency.optional() ? " (необязательная)" : "";
+        String cycle = edge.backEdge() ? " (цикл)" : "";
+        return "  " + edge.from() + " -> " + edge.to() + detail + optional + cycle;
     }
 }

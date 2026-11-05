@@ -20,7 +20,7 @@ public class HttpRegistryTransport implements RegistryTransport {
     public Response get(URI uri) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder(uri)
                 .timeout(Duration.ofSeconds(20))
-                .header("Accept", "application/json")
+                .header("Accept", "application/vnd.npm.install-v1+json, application/json")
                 .GET()
                 .build();
         HttpResponse<String> response = client.send(request,

@@ -21,7 +21,22 @@ public class NpmRegistryClient {
 
     /** Запрашивает и разбирает манифест указанного пакета. */
     public PackageMetadata fetch(String repository, String packageName) throws IOException, InterruptedException {
-        URI uri = createPackageUri(repository, packageName);
+        String body = fetchBody(repository, packageName, true);
+        try {
+            return new ManifestParser().parse(body);
+        } catch (IllegalArgumentException exception) {
+            throw new IOException("некорректный манифест npm: " + exception.getMessage(), exception);
+        }
+    }
+
+    /** Запрашивает документ со всеми версиями пакета для выбора зависимости. */
+    public String fetchVersions(String repository, String packageName) throws IOException, InterruptedException {
+        return fetchBody(repository, packageName, false);
+    }
+
+    private String fetchBody(String repository, String packageName, boolean latest)
+            throws IOException, InterruptedException {
+        URI uri = createPackageUri(repository, packageName, latest);
         RegistryTransport.Response response;
         try {
             response = transport.get(uri);
@@ -31,14 +46,10 @@ public class NpmRegistryClient {
         if (response.status() != 200) {
             throw new IOException("реестр вернул HTTP " + response.status() + " для пакета " + packageName);
         }
-        try {
-            return new ManifestParser().parse(response.body());
-        } catch (IllegalArgumentException exception) {
-            throw new IOException("некорректный манифест npm: " + exception.getMessage(), exception);
-        }
+        return response.body();
     }
 
-    private URI createPackageUri(String repository, String packageName) {
+    private URI createPackageUri(String repository, String packageName, boolean latest) {
         URI base = URI.create(repository);
         if (base.getRawQuery() != null || base.getRawFragment() != null) {
             throw new IllegalArgumentException("URL репозитория не должен содержать query или fragment");
@@ -48,6 +59,6 @@ public class NpmRegistryClient {
             prefix = prefix.substring(0, prefix.length() - 1);
         }
         String encodedName = URLEncoder.encode(packageName, StandardCharsets.UTF_8).replace("+", "%20");
-        return URI.create(prefix + "/" + encodedName + "/latest");
+        return URI.create(prefix + "/" + encodedName + (latest ? "/latest" : ""));
     }
 }

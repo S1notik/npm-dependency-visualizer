@@ -30,6 +30,18 @@ class VersionRangeTest {
     }
 
     @Test
+    void comparesExactAndPartialVersionBoundaries() {
+        check(">=1.2.3", "1.2.3", "1.2.2");
+        check("<1.2.3", "1.2.2", "1.2.3");
+        check(">1.2.3", "1.2.4", "1.2.3");
+        check("<=1.2.3", "1.2.3", "1.2.4");
+        check(">=1.2", "1.2.0", "1.1.99");
+        check("<1.2", "1.1.99", "1.2.0");
+        check(">1.2", "1.3.0", "1.2.99");
+        check("<=1.2", "1.2.99", "1.3.0");
+    }
+
+    @Test
     void prereleasesNeedMatchingExplicitBase() {
         VersionRange range = VersionRange.parse("^1.2.3-beta.2");
         assertTrue(range.includes(SemVer.parse("1.2.3-beta.3")));
@@ -63,6 +75,14 @@ class VersionRangeTest {
         assertEquals("1.9.0-beta.1", VersionSelector.select(versions, tags, "next"));
         assertEquals("2.0.0", VersionSelector.select(versions, tags, "latest"));
         assertThrows(IllegalArgumentException.class, () -> VersionSelector.select(versions, tags, "^3.0.0"));
+    }
+
+    @Test
+    void usesStableTieBreakForEquivalentBuildMetadata() {
+        Map<String, Object> versions = new LinkedHashMap<>();
+        versions.put("1.2.3+two", Map.of());
+        versions.put("1.2.3+one", Map.of());
+        assertEquals("1.2.3+two", VersionSelector.select(versions, Map.of(), "1.2.3"));
     }
 
     @Test

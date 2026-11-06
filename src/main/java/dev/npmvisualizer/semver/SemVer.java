@@ -11,7 +11,6 @@ public record SemVer(long major, long minor, long patch, List<String> prerelease
                     + "(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?"
                     + "(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$");
 
-    /** Сохраняет неизменяемую копию идентификаторов prerelease. */
     public SemVer {
         prerelease = List.copyOf(prerelease);
     }

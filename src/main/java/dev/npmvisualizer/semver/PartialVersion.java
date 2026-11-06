@@ -6,6 +6,9 @@ import java.util.regex.Pattern;
 
 /** Частичная версия или X-range, используемая при разборе ограничения. */
 final class PartialVersion {
+    static final int MAJOR_PRECISION = 1;
+    static final int MINOR_PRECISION = 2;
+    private static final int FULL_PRECISION = 3;
     private static final String PART = "(0|[1-9][0-9]*|[xX*])";
     private static final Pattern PATTERN = Pattern.compile("^v?" + PART + "(?:\\." + PART + ")?"
             + "(?:\\." + PART + ")?(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?"
@@ -25,9 +28,9 @@ final class PartialVersion {
         if (!match.matches()) {
             throw new IllegalArgumentException("неподдерживаемое ограничение версии: " + text);
         }
-        long[] numbers = new long[3];
+        long[] numbers = new long[FULL_PRECISION];
         int precision = readParts(match, numbers);
-        if (match.group(4) != null && precision != 3) {
+        if (match.group(4) != null && precision != FULL_PRECISION) {
             throw new IllegalArgumentException("prerelease требует полную версию: " + text);
         }
         String full = numbers[0] + "." + numbers[1] + "." + numbers[2];
@@ -41,7 +44,7 @@ final class PartialVersion {
         int precision = 0;
         boolean wildcard = false;
         try {
-            for (int i = 1; i <= 3; i++) {
+            for (int i = 1; i <= FULL_PRECISION; i++) {
                 String part = match.group(i);
                 if (part == null || part.matches("[xX*]")) {
                     wildcard = true;
@@ -62,12 +65,16 @@ final class PartialVersion {
         return precision;
     }
 
+    boolean isFull() {
+        return precision == FULL_PRECISION;
+    }
+
     SemVer lower() {
         return lower;
     }
 
     SemVer nextPartial() {
-        return precision == 1 ? nextMajor() : nextMinor();
+        return precision == MAJOR_PRECISION ? nextMajor() : nextMinor();
     }
 
     SemVer nextMajor() {

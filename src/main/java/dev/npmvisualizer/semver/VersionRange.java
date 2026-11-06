@@ -47,7 +47,7 @@ public final class VersionRange {
         if (start.precision() > 0) {
             set.add(Operation.GTE, start.lower());
         }
-        if (end.precision() == 3) {
+        if (end.isFull()) {
             set.add(Operation.LTE, end.lower());
         } else if (end.precision() > 0) {
             set.add(Operation.LT, beforePrereleases(end.nextPartial()));
@@ -72,7 +72,7 @@ public final class VersionRange {
     }
 
     private static void addExactOrPartial(ComparatorSet set, PartialVersion version) {
-        if (version.precision() == 3) {
+        if (version.isFull()) {
             set.add(Operation.EQ, version.lower());
         } else if (version.precision() > 0) {
             set.add(Operation.GTE, version.lower());
@@ -87,15 +87,29 @@ public final class VersionRange {
             }
             return;
         }
-        boolean full = version.precision() == 3;
         switch (op) {
             case ">=" -> set.add(Operation.GTE, version.lower());
-            case "<" -> set.add(Operation.LT, full ? version.lower() : beforePrereleases(version.lower()));
-            case ">" -> set.add(full ? Operation.GT : Operation.GTE, full ? version.lower() : version.nextPartial());
-            case "<=" -> set.add(full ? Operation.LTE : Operation.LT,
-                    full ? version.lower() : beforePrereleases(version.nextPartial()));
+            case "<" -> addLessThan(set, version);
+            case ">" -> addGreaterThan(set, version);
+            case "<=" -> addLessOrEqual(set, version);
             default -> throw new IllegalArgumentException("неизвестный оператор сравнения");
         }
+    }
+
+    private static void addLessThan(ComparatorSet set, PartialVersion version) {
+        SemVer bound = version.isFull() ? version.lower() : beforePrereleases(version.lower());
+        set.add(Operation.LT, bound);
+    }
+
+    private static void addGreaterThan(ComparatorSet set, PartialVersion version) {
+        boolean full = version.isFull();
+        set.add(full ? Operation.GT : Operation.GTE, full ? version.lower() : version.nextPartial());
+    }
+
+    private static void addLessOrEqual(ComparatorSet set, PartialVersion version) {
+        boolean full = version.isFull();
+        set.add(full ? Operation.LTE : Operation.LT,
+                full ? version.lower() : beforePrereleases(version.nextPartial()));
     }
 
     private static void addCaret(ComparatorSet set, PartialVersion version) {
@@ -105,9 +119,9 @@ public final class VersionRange {
         set.add(Operation.GTE, version.lower());
         SemVer low = version.lower();
         SemVer upper;
-        if (low.major() > 0 || version.precision() == 1) {
+        if (low.major() > 0 || version.precision() == PartialVersion.MAJOR_PRECISION) {
             upper = version.nextMajor();
-        } else if (low.minor() > 0 || version.precision() == 2) {
+        } else if (low.minor() > 0 || version.precision() == PartialVersion.MINOR_PRECISION) {
             upper = version.nextMinor();
         } else {
             upper = version.nextPatch();
@@ -118,7 +132,8 @@ public final class VersionRange {
     private static void addTilde(ComparatorSet set, PartialVersion version) {
         if (version.precision() > 0) {
             set.add(Operation.GTE, version.lower());
-            SemVer upper = version.precision() == 1 ? version.nextMajor() : version.nextMinor();
+            SemVer upper = version.precision() == PartialVersion.MAJOR_PRECISION
+                    ? version.nextMajor() : version.nextMinor();
             set.add(Operation.LT, beforePrereleases(upper));
         }
     }

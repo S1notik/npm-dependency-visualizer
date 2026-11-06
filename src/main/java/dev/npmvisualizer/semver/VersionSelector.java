@@ -24,8 +24,7 @@ public final class VersionSelector {
             if (version == null || !range.includes(version)) {
                 continue;
             }
-            if (best == null || version.compareTo(best) > 0
-                    || (version.compareTo(best) == 0 && candidate.compareTo(selected) > 0)) {
+            if (isBetter(version, candidate, best, selected)) {
                 best = version;
                 selected = candidate;
             }
@@ -34,6 +33,14 @@ public final class VersionSelector {
             throw new IllegalArgumentException("нет опубликованной версии для ограничения: " + requirement);
         }
         return selected;
+    }
+
+    private static boolean isBetter(SemVer version, String candidate, SemVer best, String selected) {
+        if (best == null) {
+            return true;
+        }
+        int comparison = version.compareTo(best);
+        return comparison > 0 || (comparison == 0 && candidate.compareTo(selected) > 0);
     }
 
     private static SemVer parseCandidate(String value) {

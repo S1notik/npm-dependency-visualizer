@@ -7,7 +7,6 @@ import java.util.Map;
 
 /** Направленный граф с сохранёнными объявлениями и обратными рёбрами DFS. */
 public record DependencyGraph(Map<String, PackageInfo> nodes, List<Edge> edges) {
-    /** Защищает граф от изменения после построения. */
     public DependencyGraph {
         nodes = Collections.unmodifiableMap(new LinkedHashMap<>(nodes));
         edges = List.copyOf(edges);

@@ -23,6 +23,17 @@ class JsonParserTest {
     }
 
     @Test
+    void parsesAllStandardEscapes() {
+        assertEquals("\"\\/\b\f\n\r\t", JsonParser.parse("\"\\\"\\\\\\/\\b\\f\\n\\r\\t\""));
+    }
+
+    @Test
+    void rejectsRawControlCharactersAndAcceptsSpace() {
+        assertThrows(IllegalArgumentException.class, () -> JsonParser.parse("\"\u001f\""));
+        assertEquals(" ", JsonParser.parse("\" \""));
+    }
+
+    @Test
     void rejectsInvalidJson() {
         for (String input : List.of("", "{\"a\":1,}", "[1,]", "01", "1.", "1e+", "true false",
                 "\"\\q\"", "\"\\u12X4\"", "{\"a\":null,\"a\":1}", "{\"a\":\"unterminated}")) {

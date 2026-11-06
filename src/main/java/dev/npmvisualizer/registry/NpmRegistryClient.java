@@ -1,6 +1,7 @@
 package dev.npmvisualizer.registry;
 
 import java.io.IOException;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -28,7 +29,7 @@ public class NpmRegistryClient {
         } catch (IOException exception) {
             throw new IOException("не удалось обратиться к реестру: " + exception.getMessage(), exception);
         }
-        if (response.status() != 200) {
+        if (response.status() != HttpURLConnection.HTTP_OK) {
             throw new IOException("реестр вернул HTTP " + response.status() + " для пакета " + packageName);
         }
         try {

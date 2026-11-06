@@ -9,6 +9,8 @@ import java.util.Map;
 /** Разбирает JSON-ответ реестра без сторонней библиотеки. */
 public final class JsonParser {
     private static final int MAX_DEPTH = 128;
+    private static final char FIRST_UNESCAPED_CHARACTER = ' ';
+    private static final int UNICODE_ESCAPE_DIGITS = 4;
     private final String input;
     private int position;
 
@@ -97,7 +99,7 @@ public final class JsonParser {
             }
             if (character == '\\') {
                 result.append(readEscape());
-            } else if (character < 0x20) {
+            } else if (character < FIRST_UNESCAPED_CHARACTER) {
                 throw error("управляющий символ внутри строки");
             } else {
                 result.append(character);
@@ -110,26 +112,31 @@ public final class JsonParser {
         if (position >= input.length()) {
             throw error("незавершённая escape-последовательность");
         }
-        return switch (input.charAt(position++)) {
-            case '"' -> '"';
-            case '\\' -> '\\';
-            case '/' -> '/';
+        char character = input.charAt(position++);
+        if (character == 'u') {
+            return readUnicodeEscape();
+        }
+        return readSimpleEscape(character);
+    }
+
+    private char readSimpleEscape(char character) {
+        return switch (character) {
+            case '"', '\\', '/' -> character;
             case 'b' -> '\b';
             case 'f' -> '\f';
             case 'n' -> '\n';
             case 'r' -> '\r';
             case 't' -> '\t';
-            case 'u' -> readUnicodeEscape();
             default -> throw error("неизвестная escape-последовательность");
         };
     }
 
     private char readUnicodeEscape() {
-        if (position + 4 > input.length()) {
+        if (position + UNICODE_ESCAPE_DIGITS > input.length()) {
             throw error("незавершённая последовательность Unicode");
         }
         int value = 0;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < UNICODE_ESCAPE_DIGITS; i++) {
             char character = input.charAt(position++);
             int digit = "0123456789abcdef".indexOf(Character.toLowerCase(character));
             if (digit < 0) {
